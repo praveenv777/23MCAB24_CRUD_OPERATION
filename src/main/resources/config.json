@@ -1,0 +1,4 @@
+{
+  "db_name": "stationery",
+  "connection_string": "mongodb://localhost:27017"
+}
