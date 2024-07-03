@@ -6,6 +6,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.mongo.MongoClient;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.RoutingContext;
 
 public class MainVerticle extends AbstractVerticle {
 
@@ -39,7 +40,7 @@ public class MainVerticle extends AbstractVerticle {
                 });
     }
 
-    private void addItem(io.vertx.ext.web.RoutingContext ctx) {
+    private void addItem(RoutingContext ctx) {
         JsonObject item = ctx.getBodyAsJson();
         mongoClient.save("items", item, res -> {
             if (res.succeeded()) {
@@ -54,7 +55,7 @@ public class MainVerticle extends AbstractVerticle {
         });
     }
 
-    private void getItem(io.vertx.ext.web.RoutingContext ctx) {
+    private void getItem(RoutingContext ctx) {
         String itemId = ctx.pathParam("itemId");
         mongoClient.findOne("items", new JsonObject().put("itemId", itemId), null, res -> {
             if (res.succeeded() && res.result() != null) {
@@ -69,33 +70,49 @@ public class MainVerticle extends AbstractVerticle {
         });
     }
 
-    private void updateItem(io.vertx.ext.web.RoutingContext ctx) {
+    private void updateItem(RoutingContext ctx) {
         String itemId = ctx.pathParam("itemId");
         JsonObject update = ctx.getBodyAsJson();
-        mongoClient.updateCollection("items", new JsonObject().put("itemId", itemId), new JsonObject().put("$set", update), res -> {
+        JsonObject query = new JsonObject().put("itemId", itemId);
+        JsonObject updateCommand = new JsonObject().put("$set", update);
+
+        mongoClient.updateCollection("items", query, updateCommand, res -> {
             if (res.succeeded()) {
-                ctx.response()
-                        .end("Item updated successfully");
+                if (res.result().getDocModified() > 0) {
+                    ctx.response()
+                            .end("Item updated successfully");
+                } else {
+                    ctx.response()
+                            .setStatusCode(404)
+                            .end("Item not found");
+                }
             } else {
                 ctx.response()
                         .setStatusCode(500)
-                        .end("Failed to update item");
+                        .end("Failed to update item: " + res.cause().getMessage());
             }
         });
     }
 
-    private void deleteItem(io.vertx.ext.web.RoutingContext ctx) {
+    private void deleteItem(RoutingContext ctx) {
         String itemId = ctx.pathParam("itemId");
-        mongoClient.removeDocument("items", new JsonObject().put("itemId", itemId), res -> {
+        JsonObject query = new JsonObject().put("itemId", itemId);
+
+        mongoClient.removeDocument("items", query, res -> {
             if (res.succeeded()) {
-                ctx.response()
-                        .end("Item deleted successfully");
+                if (res.result().getRemovedCount() > 0) {
+                    ctx.response()
+                            .end("Item deleted successfully");
+                } else {
+                    ctx.response()
+                            .setStatusCode(404)
+                            .end("Item not found");
+                }
             } else {
                 ctx.response()
                         .setStatusCode(500)
-                        .end("Failed to delete item");
+                        .end("Failed to delete item: " + res.cause().getMessage());
             }
         });
     }
 }
-
